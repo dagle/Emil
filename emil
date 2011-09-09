@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+# -*- mode: python; coding: utf-8 -*-
+# Copyright (C) 2011 Per Odlund <per.odlund@gmail.com>
+# Copyright (C) 2011 Göran Weinholt <goran@weinholt.se>
+
+import gobject, gtk, webkit
+import threading, BaseHTTPServer
+
+server_address = ('127.0.0.1', 1234)
+
+welcome_page = """
+<html>
+<body>
+<p>Hello, World!</p>
+<p><a href="http://%s:%d/">Local Emil server</a></p>
+<p><a href="https://github.com/dagle/Emil">Emil's github website</a></p>
+<p><a href="https://weinholt.se">Weinholt's website</a></p>
+</body>
+</html>
+""" % server_address
+
+class EmilWindow(gtk.Window):
+    """These objects contain the whole GUI."""
+    def __init__(self):
+        def destroyer(self):
+            """This is called when the WM wants to close the window.
+            Should destroy the EmilWindow and exit the program if this
+            is the last window."""
+            self.destroy()
+            # TODO: when we support multiple windows, check for that here.
+            gtk.main_quit()
+        gtk.Window.__init__(self)
+
+        self.page = webkit.WebView()
+        self.page.load_string(welcome_page, "text/html", "utf-8", "Start")
+        self.add(self.page)
+        self.connect('destroy', destroyer)
+        self.show_all()
+
+class EmilServer(BaseHTTPServer.BaseHTTPRequestHandler):
+    """This class represents the built-in web server."""
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(repr(self.path)+'\n'+repr(dir(self)))
+
+class ServerThread(threading.Thread):
+    """This class is for the thread that runs the EmilServer."""
+    def __init__(self, address):
+        threading.Thread.__init__(self)
+        self.listen_address = address
+        self.daemon = True
+    def run(self):
+        print dir(self)
+        BaseHTTPServer.HTTPServer(self.listen_address, EmilServer).serve_forever()
+
+if __name__ == "__main__":
+    emil = EmilWindow()
+    server = ServerThread(server_address)
+    server.start()
+    gtk.gdk.threads_init()
+    gtk.main()
