@@ -1,0 +1,20 @@
+<html>
+<script type="text/javascript">
+function update_title(s) {
+  title = s;
+  redraw();
+}
+
+function redraw() {
+  line = document.getElementById("line");
+  msg = '--- ' + title + ' ';
+  for (i = 0; i < 500; i++) msg = msg + '-';
+  line.innerHTML = msg;
+}
+
+title = 'Start page';
+</script>
+<body style="background:lightgrey;color:black;font-family:monospace;font-size:14px" onload="redraw();">
+<div id="line" style="position:absolute;left:0px;top:0px"></div>
+</body>
+</html>

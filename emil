@@ -8,16 +8,43 @@ import threading, BaseHTTPServer
 
 server_address = ('127.0.0.1', 1234)
 
-welcome_page = """
-<html>
+welcome_page = """<html>
 <body>
-<p>Hello, World!</p>
+<p><h1>Hello, World!</h1></p>
 <p><a href="http://%s:%d/">Local Emil server</a></p>
 <p><a href="https://github.com/dagle/Emil">Emil's github website</a></p>
 <p><a href="https://weinholt.se">Weinholt's website</a></p>
 </body>
-</html>
-""" % server_address
+</html>""" % server_address
+
+def update_minibuf(buf,msg):
+    # TODO: escape the message.
+    buf.minibuf.execute_script('update_minibuf("%s");' % msg)
+
+class EmilBuffer(gtk.VBox):
+    """The EmilBuffer contains a web view, a status bar and a mini buffer."""
+    def __init__(self):
+        gtk.VBox.__init__(self, homogeneous=False, spacing=0)
+        self.view = webkit.WebView()
+        self.view.connect("title-changed", self.title_changed)
+        self.view.load_uri("http://%s:%d/" % server_address)
+        scroll = gtk.ScrolledWindow()
+        scroll.add(self.view)
+        self.add(scroll)
+
+        self.status = webkit.WebView()
+        self.status.set_property('height-request', 14 + 2)
+        self.status.load_uri("http://%s:%d/page/status.html" % server_address)
+        self.pack_start(self.status, expand=False, fill=False)
+
+        self.minibuf = webkit.WebView()
+        self.minibuf.set_property('height-request', 14 + 2)
+        self.minibuf.load_uri("http://%s:%d/page/minibuf.html" % server_address)
+        self.pack_end(self.minibuf, expand=False, fill=False)
+
+    def title_changed(self, webview, frame, title):
+        # TODO: escape the message
+        self.status.execute_script('update_title("%s");' % title)
 
 class EmilWindow(gtk.Window):
     """These objects contain the whole GUI."""
@@ -31,19 +58,28 @@ class EmilWindow(gtk.Window):
             gtk.main_quit()
         gtk.Window.__init__(self)
 
-        self.page = webkit.WebView()
-        self.page.load_string(welcome_page, "text/html", "utf-8", "Start")
-        self.add(self.page)
+        self.add(EmilBuffer())
         self.connect('destroy', destroyer)
+        self.set_default_size(640, 480)
         self.show_all()
 
 class EmilServer(BaseHTTPServer.BaseHTTPRequestHandler):
     """This class represents the built-in web server."""
+    # XXX: this whole thing is completely insecure.
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/plain')
+        self.send_header('Content-type', 'text/html')
         self.end_headers()
-        self.wfile.write(repr(self.path)+'\n'+repr(dir(self)))
+        if self.path == '/':
+            self.wfile.write(welcome_page)
+        elif self.path.startswith('/page/'):
+            f = open(self.path[len('/page/'):], 'r')
+            while True:
+                s = f.read(1024)
+                if s == '': break
+                self.wfile.write(s)
+        else:
+            self.wfile.write(repr(self.path) + '\n' + repr(dir(self)))
 
 class ServerThread(threading.Thread):
     """This class is for the thread that runs the EmilServer."""
@@ -52,7 +88,6 @@ class ServerThread(threading.Thread):
         self.listen_address = address
         self.daemon = True
     def run(self):
-        print dir(self)
         BaseHTTPServer.HTTPServer(self.listen_address, EmilServer).serve_forever()
 
 if __name__ == "__main__":
