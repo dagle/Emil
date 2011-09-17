@@ -60,8 +60,23 @@ class EmilWindow(gtk.Window):
 
         self.add(EmilBuffer())
         self.connect('destroy', destroyer)
+        self.connect('key-press-event', self.key_press)
         self.set_default_size(640, 480)
         self.show_all()
+
+    def key_press(self, _, e):
+        def handle(key):
+            print key
+            return False
+        if e.is_modifier: return False
+        key = ''
+        if (e.state & gtk.gdk.CONTROL_MASK)!=0: key += 'C-'
+        if (e.state & gtk.gdk.MOD1_MASK)!=0: key += 'M-'
+        char = gtk.gdk.keyval_to_unicode(e.keyval)
+        if char != 0:
+            return handle(key + unichr(char))
+        name = gtk.gdk.keyval_name(e.keyval)
+        return handle(key + name)
 
 class EmilServer(BaseHTTPServer.BaseHTTPRequestHandler):
     """This class represents the built-in web server."""
