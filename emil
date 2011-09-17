@@ -5,6 +5,7 @@
 
 import gobject, gtk, webkit
 import threading, BaseHTTPServer
+import json
 
 server_address = ('127.0.0.1', 1234)
 
@@ -18,8 +19,7 @@ welcome_page = """<html>
 </html>""" % server_address
 
 def update_minibuf(buf,msg):
-    # TODO: escape the message.
-    buf.minibuf.execute_script('update_minibuf("%s");' % msg)
+    buf.minibuf.execute_script('update_minibuf(%s);' % json.dumps(msg))
 
 class EmilBuffer(gtk.VBox):
     """The EmilBuffer contains a web view, a status bar and a mini buffer."""
@@ -43,8 +43,7 @@ class EmilBuffer(gtk.VBox):
         self.pack_end(self.minibuf, expand=False, fill=False)
 
     def title_changed(self, webview, frame, title):
-        # TODO: escape the message
-        self.status.execute_script('update_title("%s");' % title)
+        self.status.execute_script('update_title(%s);' % json.dumps(title))
 
 class EmilWindow(gtk.Window):
     """These objects contain the whole GUI."""
