@@ -18,8 +18,9 @@ welcome_page = """<html>
 </body>
 </html>""" % server_address
 
-def update_minibuf(buf,msg):
-    buf.minibuf.execute_script('update_minibuf(%s);' % json.dumps(msg))
+def fun_kill_emil(buf):
+    buf.get_parent_window().destroy()
+    gtk.main_quit()
 
 class EmilBuffer(gtk.VBox):
     """The EmilBuffer contains a web view, a status bar and a mini buffer."""
@@ -42,8 +43,34 @@ class EmilBuffer(gtk.VBox):
         self.minibuf.load_uri("http://%s:%d/page/minibuf.html" % server_address)
         self.pack_end(self.minibuf, expand=False, fill=False)
 
+        self.keymap = {}
+        self.keymap['C-x'] = {}
+        self.keymap['C-x']['C-c'] = fun_kill_emil
+        self.next_map = self.keymap
+
     def title_changed(self, webview, frame, title):
         self.status.execute_script('update_title(%s);' % json.dumps(title))
+
+    def update_minibuf(self, msg):
+        self.minibuf.execute_script('update_minibuf(%s);' % json.dumps(msg))
+
+    def key_press(self, key):
+        if not key in self.next_map:
+            # The key was not bound. Pass it through to the focused webview.
+            self.next_map = self.keymap
+            self.update_minibuf("")
+            return False
+        b = self.next_map[key]
+        if b.__class__ == dict:
+            # The key pressed was a prefix key, like C-x.
+            self.next_map = b
+            self.update_minibuf("%s-" %key)
+            return True
+        if b.__class__ == (lambda:0).__class__:
+            # The key is bound to a function.
+            b(self)
+            return True
+        return False
 
 class EmilWindow(gtk.Window):
     """These objects contain the whole GUI."""
@@ -63,10 +90,12 @@ class EmilWindow(gtk.Window):
         self.set_default_size(640, 480)
         self.show_all()
 
+    def get_buffer(self):
+        return self.get_child()
+
     def key_press(self, _, e):
         def handle(key):
-            print key
-            return False
+            return self.get_buffer().key_press(key)
         if e.is_modifier: return False
         key = ''
         if (e.state & gtk.gdk.CONTROL_MASK)!=0: key += 'C-'
