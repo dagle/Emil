@@ -24,11 +24,11 @@ def fun_kill_emil(buf):
 
 class EmilBuffer(gtk.VBox):
     """The EmilBuffer contains a web view, a status bar and a mini buffer."""
-    def __init__(self):
+    def __init__(self, startUrl):
         gtk.VBox.__init__(self, homogeneous=False, spacing=0)
         self.view = webkit.WebView()
         self.view.connect("title-changed", self.title_changed)
-        self.view.load_uri("http://%s:%d/" % server_address)
+        self.view.load_uri(startUrl)
         scroll = gtk.ScrolledWindow()
         scroll.add(self.view)
         self.add(scroll)
@@ -74,7 +74,7 @@ class EmilBuffer(gtk.VBox):
 
 class EmilWindow(gtk.Window):
     """These objects contain the whole GUI."""
-    def __init__(self):
+    def __init__(self, startUrl):
         def destroyer(self):
             """This is called when the WM wants to close the window.
             Should destroy the EmilWindow and exit the program if this
@@ -84,7 +84,7 @@ class EmilWindow(gtk.Window):
             gtk.main_quit()
         gtk.Window.__init__(self)
 
-        self.add(EmilBuffer())
+        self.add(EmilBuffer(startUrl))
         self.connect('destroy', destroyer)
         self.connect('key-press-event', self.key_press)
         self.set_default_size(640, 480)
@@ -134,7 +134,13 @@ class ServerThread(threading.Thread):
         BaseHTTPServer.HTTPServer(self.listen_address, EmilServer).serve_forever()
 
 if __name__ == "__main__":
-    emil = EmilWindow()
+    import optparse
+    parser = optparse.OptionParser('usage: %prog [options] [url]')
+    (opts, args) = parser.parse_args()
+    if not args:
+        emil = EmilWindow("http://%s:%d/" % server_address)
+    else:
+        emil = EmilWindow(args[0])
     server = ServerThread(server_address)
     server.start()
     gtk.gdk.threads_init()
