@@ -1,0 +1,18 @@
+Kunna öppna källkod, både emils och html/js.
+Smidigt sätt att kunna uppdatera kod som körs, python och html/js.
+En vettig och smidig editor där man kan ändra på saker. (keybindings, omladdning, IO och annat som emacs har).
+Bra/enkelt vis att kunna skicka saker (kod, object, medelanden) mellan alla views och python etc.
+Vettig fönsterhantering med tabbar, splits och buffrar (bakomliggande).	
+Modes skrivna i javaskript som kan ändra hela eller delivs funktionaliteten för läsaren i en buffer. 
+Ett interface till jQuery (eller liknade) som underlättar programmering från minibuffern.
+Ett standardlib i javaskript med händiga funktioner som enkelt kan expanderas.
+En del exempel på saker man kan göra.
+
+Kanske:
+Tillgång till domträdet i python och ett smidigt vis att jobba runt det?
+Ett jättesimpelt pluginsystem som inte kräver omstart?
+
+Jobbiga?
+Enkelt kunna spara ändringar man gör till en hemsida och interaktivt bygga modes.
+En utvecklingsmiljö med en enklare debugger och kunna kompla element till skärmen till en kodbuffer?
+
