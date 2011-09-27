@@ -4,52 +4,77 @@
 # Copyright (C) 2011 Göran Weinholt <goran@weinholt.se>
 
 import gobject, gtk, webkit
-import threading, BaseHTTPServer
 import json
-
-server_address = ('127.0.0.1', 1234)
-
-welcome_page = """<html>
-<body>
-<p><h1>Hello, World!</h1></p>
-<p><a href="http://%s:%d/">Local Emil server</a></p>
-<p><a href="https://github.com/dagle/Emil">Emil's github website</a></p>
-<p><a href="https://weinholt.se">Weinholt's website</a></p>
-</body>
-</html>""" % server_address
-
-def fun_kill_emil(buf):
-    buf.get_parent_window().destroy()
-    gtk.main_quit()
 
 class EmilBuffer(gtk.VBox):
     """The EmilBuffer contains a web view, a status bar and a mini buffer."""
     def __init__(self, startUrl):
+        self.startUrl=startUrl  # save for later
         gtk.VBox.__init__(self, homogeneous=False, spacing=0)
         self.view = webkit.WebView()
-        self.view.connect("title-changed", self.title_changed)
-        self.view.load_uri(startUrl)
+        self.view.connect("title-changed", self.title_changed_cb)
+        self.view.connect("load-finished", self.load_finished_cb)
+        self.view.load_string(open("emil.html").read(),'text/html','utf-8','')
         scroll = gtk.ScrolledWindow()
         scroll.add(self.view)
         self.add(scroll)
+        self.pages = []         # Will keep WebViews for WWW pages
 
         self.status = webkit.WebView()
         self.status.set_property('height-request', 14 + 2)
-        self.status.load_uri("http://%s:%d/page/status.html" % server_address)
+        self.status.load_string(open("status.html").read(),'text/html','utf-8','')
+        self.status.connect("load-finished", self.load_finished_cb)
         self.pack_start(self.status, expand=False, fill=False)
 
         self.minibuf = webkit.WebView()
         self.minibuf.set_property('height-request', 14 + 2)
-        self.minibuf.load_uri("http://%s:%d/page/minibuf.html" % server_address)
+        self.minibuf.load_string(open("minibuf.html").read(),'text/html','utf-8','')
+        self.minibuf.connect("load-finished", self.load_finished_cb)
         self.pack_end(self.minibuf, expand=False, fill=False)
 
+        self.loads_completed = 0
+
         self.keymap = {}
-        self.keymap['C-x'] = {}
-        self.keymap['C-x']['C-c'] = fun_kill_emil
         self.next_map = self.keymap
 
-    def title_changed(self, webview, frame, title):
-        self.status.execute_script('update_title(%s);' % json.dumps(title))
+    def title_changed_cb(self, webview, frame, title):
+        # The Emil JavaScript part communicates with the Python part
+        # of Emil by setting its document title to JSON encoded
+        # function calls.
+        x = json.loads(title)
+        print "JSON request:",x
+        if type(x) != type([]) or len(x)<1: return
+        # TODO: make these into functions bound to some sort of object
+        if x[0] == "global_key_set":
+            (key,code)=x[1:]
+            keymap = self.keymap
+            keypresses = key.split()
+            for keypress, idx in zip(keypresses,range(len(keypresses),0,-1)):
+                if not keypress in keymap:
+                    if idx > 1:
+                        keymap[keypress]={}
+                    else:
+                        keymap[keypress]=code
+                keymap = keymap[keypress]
+            print 'new keymap:',self.keymap
+        elif x[0] == "kill_emil":
+            self.get_parent_window().destroy()
+            gtk.main_quit()
+        elif x[0] == "minibuf_eval":
+            self.minibuf.execute_script(x[1])
+        elif x[0] == "status_eval":
+            self.status.execute_script(x[1])
+        else:
+            self.update_minibuf("Undefined pycall: %s" % x)
+
+    def load_finished_cb(self, view, frame):
+        self.view.execute_script(open("emil.js").read())
+        self.loads_completed += 1
+        if self.loads_completed == 3:
+            print "All three WebViews are finished loading."
+            self.view.execute_script('init_emil();')
+            if self.startUrl:
+                self.view.execute_script("open_url(%s);" % json.dumps(self.startUrl));
 
     def update_minibuf(self, msg):
         self.minibuf.execute_script('update_minibuf(%s);' % json.dumps(msg))
@@ -58,18 +83,25 @@ class EmilBuffer(gtk.VBox):
         if not key in self.next_map:
             # The key was not bound. Pass it through to the focused webview.
             self.next_map = self.keymap
-            self.update_minibuf("")
+            #self.update_minibuf("")
             return False
         b = self.next_map[key]
-        if b.__class__ == dict:
+        print "Key:",key,"Binding:",b
+        if type(b) == type({}):
             # The key pressed was a prefix key, like C-x.
             self.next_map = b
-            self.update_minibuf("%s-" %key)
+            #self.update_minibuf("%s-" %key)
             return True
-        if b.__class__ == (lambda:0).__class__:
+        elif type(b) == type(lambda:0):
             # The key is bound to a function.
             b(self)
             return True
+        elif type(b) == type("") or type(b) == type(u""):
+            # Bound to JavaScript code
+            #self.update_minibuf("")
+            self.view.execute_script(b)
+            return True
+        print "Key not bound."
         return False
 
 class EmilWindow(gtk.Window):
@@ -77,10 +109,8 @@ class EmilWindow(gtk.Window):
     def __init__(self, startUrl):
         def destroyer(self):
             """This is called when the WM wants to close the window.
-            Should destroy the EmilWindow and exit the program if this
-            is the last window."""
+            Should destroy the EmilWindow and exit the program."""
             self.destroy()
-            # TODO: when we support multiple windows, check for that here.
             gtk.main_quit()
         gtk.Window.__init__(self)
 
@@ -95,7 +125,7 @@ class EmilWindow(gtk.Window):
 
     def key_press(self, _, e):
         def handle(key):
-            return self.get_buffer().key_press(key)
+            return self.get_buffer().key_press(unicode(key))
         if e.is_modifier: return False
         key = ''
         if (e.state & gtk.gdk.CONTROL_MASK)!=0: key += 'C-'
@@ -106,42 +136,9 @@ class EmilWindow(gtk.Window):
         name = gtk.gdk.keyval_name(e.keyval)
         return handle(key + name)
 
-class EmilServer(BaseHTTPServer.BaseHTTPRequestHandler):
-    """This class represents the built-in web server."""
-    # XXX: this whole thing is completely insecure.
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        if self.path == '/':
-            self.wfile.write(welcome_page)
-        elif self.path.startswith('/page/'):
-            f = open(self.path[len('/page/'):], 'r')
-            while True:
-                s = f.read(1024)
-                if s == '': break
-                self.wfile.write(s)
-        else:
-            self.wfile.write(repr(self.path) + '\n' + repr(dir(self)))
-
-class ServerThread(threading.Thread):
-    """This class is for the thread that runs the EmilServer."""
-    def __init__(self, address):
-        threading.Thread.__init__(self)
-        self.listen_address = address
-        self.daemon = True
-    def run(self):
-        BaseHTTPServer.HTTPServer(self.listen_address, EmilServer).serve_forever()
-
 if __name__ == "__main__":
     import optparse
     parser = optparse.OptionParser('usage: %prog [options] [url]')
     (opts, args) = parser.parse_args()
-    if not args:
-        emil = EmilWindow("http://%s:%d/" % server_address)
-    else:
-        emil = EmilWindow(args[0])
-    server = ServerThread(server_address)
-    server.start()
-    gtk.gdk.threads_init()
+    emil = EmilWindow(args and args[0])
     gtk.main()
