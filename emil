@@ -23,12 +23,14 @@ class EmilBuffer(gtk.VBox):
         self.status = webkit.WebView()
         self.status.set_property('height-request', 14 + 2)
         self.status.load_string(open("status.html").read(),'text/html','utf-8','')
+        self.status.connect("title-changed", self.title_changed_cb)
         self.status.connect("load-finished", self.load_finished_cb)
         self.pack_start(self.status, expand=False, fill=False)
 
         self.minibuf = webkit.WebView()
         self.minibuf.set_property('height-request', 14 + 2)
         self.minibuf.load_string(open("minibuf.html").read(),'text/html','utf-8','')
+        self.minibuf.connect("title-changed", self.title_changed_cb)
         self.minibuf.connect("load-finished", self.load_finished_cb)
         self.pack_end(self.minibuf, expand=False, fill=False)
 
@@ -36,12 +38,14 @@ class EmilBuffer(gtk.VBox):
 
         self.keymap = {}
         self.next_map = self.keymap
+        self.current_prefix = ""
 
     def title_changed_cb(self, webview, frame, title):
         # The Emil JavaScript part communicates with the Python part
         # of Emil by setting its document title to JSON encoded
         # function calls.
         x = json.loads(title)
+        if not x: return
         print "JSON request:",x
         if type(x) != type([]) or len(x)<1: return
         # TODO: make these into functions bound to some sort of object
@@ -60,15 +64,14 @@ class EmilBuffer(gtk.VBox):
         elif x[0] == "kill_emil":
             self.get_parent_window().destroy()
             gtk.main_quit()
-        elif x[0] == "minibuf_eval":
-            self.minibuf.execute_script(x[1])
-        elif x[0] == "status_eval":
-            self.status.execute_script(x[1])
+        elif x[0] == "main_eval": self.view.execute_script(x[1])
+        elif x[0] == "minibuf_eval": self.minibuf.execute_script(x[1])
+        elif x[0] == "status_eval": self.status.execute_script(x[1])
         else:
             self.update_minibuf("Undefined pycall: %s" % x)
 
     def load_finished_cb(self, view, frame):
-        self.view.execute_script(open("emil.js").read())
+        view.execute_script(open("emil.js").read())
         self.loads_completed += 1
         if self.loads_completed == 3:
             print "All three WebViews are finished loading."
@@ -80,10 +83,14 @@ class EmilBuffer(gtk.VBox):
         self.minibuf.execute_script('update_minibuf(%s);' % json.dumps(msg))
 
     def key_press(self, key):
+        def reset():
+            self.next_map = self.keymap
+            self.current_prefix = ""
         if not key in self.next_map:
             # The key was not bound. Pass it through to the focused webview.
-            self.next_map = self.keymap
-            #self.update_minibuf("")
+            self.view.execute_script('unused_key(%s);' %
+                                     json.dumps(self.current_prefix + " " + key))
+            reset()
             return False
         b = self.next_map[key]
         print "Key:",key,"Binding:",b
@@ -91,17 +98,20 @@ class EmilBuffer(gtk.VBox):
             # The key pressed was a prefix key, like C-x.
             self.next_map = b
             #self.update_minibuf("%s-" %key)
+            self.current_prefix += key + " "
             return True
         elif type(b) == type(lambda:0):
             # The key is bound to a function.
+            reset()
             b(self)
             return True
         elif type(b) == type("") or type(b) == type(u""):
             # Bound to JavaScript code
-            #self.update_minibuf("")
-            self.view.execute_script(b)
+            reset()
+            self.view.execute_script("("+b+")();")
             return True
-        print "Key not bound."
+        print "Key not bound to anything sane:",self.next_map,key
+        reset()
         return False
 
 class EmilWindow(gtk.Window):
