@@ -69,6 +69,12 @@ class EmilBuffer(gtk.VBox):
         elif x[0] == "status_eval": self.status.execute_script(x[1])
         elif x[0] == 'main_focus': self.view.grab_focus()
         elif x[0] == 'minibuf_focus': self.minibuf.grab_focus()
+        elif x[0] == 'load_file':
+            (buf,fn) = x[1:]
+            self.view.execute_script("_load_file_cb(%s,%s,%s);" %
+                                     (json.dumps(buf), json.dumps(fn),
+                                      json.dumps(open(fn).read())))
+
         else:
             pass
             #self.update_minibuf("Undefined pycall: %s" % x)

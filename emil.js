@@ -64,8 +64,10 @@ function user_input(prompt,def,callback) {
     	function(prompt, def) {
 	    document.getElementById("p").innerHTML = prompt;
 	    document.body.text = "#00ffff";
-	    document.minibuf.line.value = def;
-	    document.minibuf.line.focus();
+	    var line = document.minibuf.line;
+	    line.value = def;
+	    line.focus();
+	    line.selectionStart = def.length;
     	}, prompt, def);
     minibuf_active = true;
     minibuf_callback = callback.name||callback+"";
@@ -84,7 +86,17 @@ function update_minibuf(msg) {
 function open_url(url) {
     // TODO: this would be done in a new webview.
     document.location = url;
-    message("");
+}
+
+function open_file(fn) {
+    pycall("load_file", "buf0", fn);
+}
+
+function _load_file_cb(buf_id, fn, contents) {
+    var buf = document.getElementById(buf_id);
+    buf.value = contents;
+    buf.selectionStart = 0;
+    buf.selectionEnd = 0;
 }
 
 function message(str) {
@@ -99,6 +111,7 @@ function return_pressed() {
 	    function (callback)  {
 		pycall("main_focus");
 		main_eval("("+callback+")("+JSON.stringify(document.minibuf.line.value)+")");
+		update_minibuf("");
 		// with_main(function(callback,input) {
 		//     callback(input); 
 		// }, callback,document.minibuf.line.value);
@@ -112,6 +125,10 @@ function init_emil() {
     global_key_set("C-c C-l",
 		   function () {
 		       user_input("Go to URL: ", "http://weinholt.se", open_url);
+		   });
+    global_key_set("C-x C-f",
+		   function () {
+		       user_input("Open file: ", "", open_file);
 		   });
     global_key_set("Return", return_pressed);
     global_key_set("KP_Enter", return_pressed);
