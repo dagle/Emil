@@ -57,17 +57,19 @@ function unused_key(key) {
     update_minibuf(key + " has no binding");
 }
 
-function user_input(prompt,callback) {
+function user_input(prompt,def,callback) {
     // Request input from the user. Would be so much better with
     // recursive editing.
     with_minibuf(
-    	function(prompt) {
+    	function(prompt, def) {
 	    document.getElementById("p").innerHTML = prompt;
 	    document.body.text = "#00ffff";
-	    document.minibuf.line.value = "http://weinholt.se";
-    	}, prompt);
+	    document.minibuf.line.value = def;
+	    document.minibuf.line.focus();
+    	}, prompt, def);
     minibuf_active = true;
     minibuf_callback = callback.name||callback+"";
+    pycall("minibuf_focus");
 }
 
 function update_minibuf(msg) {
@@ -80,9 +82,9 @@ function update_minibuf(msg) {
 }
 
 function open_url(url) {
-    // TODO: this would be done in a new webview. current this
-    // destroys the emil webview and basically kills emil.
+    // TODO: this would be done in a new webview.
     document.location = url;
+    message("");
 }
 
 function message(str) {
@@ -95,6 +97,7 @@ function return_pressed() {
 
 	with_minibuf(
 	    function (callback)  {
+		pycall("main_focus");
 		main_eval("("+callback+")("+JSON.stringify(document.minibuf.line.value)+")");
 		// with_main(function(callback,input) {
 		//     callback(input); 
@@ -108,7 +111,7 @@ function init_emil() {
     global_key_set("C-x C-c", kill_emil);
     global_key_set("C-c C-l",
 		   function () {
-		       user_input("Go to URL: ", open_url);
+		       user_input("Go to URL: ", "http://weinholt.se", open_url);
 		   });
     global_key_set("Return", return_pressed);
     global_key_set("KP_Enter", return_pressed);

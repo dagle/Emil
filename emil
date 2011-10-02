@@ -67,8 +67,11 @@ class EmilBuffer(gtk.VBox):
         elif x[0] == "main_eval": self.view.execute_script(x[1])
         elif x[0] == "minibuf_eval": self.minibuf.execute_script(x[1])
         elif x[0] == "status_eval": self.status.execute_script(x[1])
+        elif x[0] == 'main_focus': self.view.grab_focus()
+        elif x[0] == 'minibuf_focus': self.minibuf.grab_focus()
         else:
-            self.update_minibuf("Undefined pycall: %s" % x)
+            pass
+            #self.update_minibuf("Undefined pycall: %s" % x)
 
     def load_finished_cb(self, view, frame):
         view.execute_script(open("emil.js").read())
@@ -79,17 +82,14 @@ class EmilBuffer(gtk.VBox):
             if self.startUrl:
                 self.view.execute_script("open_url(%s);" % json.dumps(self.startUrl));
 
-    def update_minibuf(self, msg):
-        self.minibuf.execute_script('update_minibuf(%s);' % json.dumps(msg))
-
     def key_press(self, key):
         def reset():
             self.next_map = self.keymap
             self.current_prefix = ""
         if not key in self.next_map:
             # The key was not bound. Pass it through to the focused webview.
-            self.view.execute_script('unused_key(%s);' %
-                                     json.dumps(self.current_prefix + " " + key))
+            # self.view.execute_script('unused_key(%s);' %
+            #                          json.dumps(self.current_prefix + " " + key))
             reset()
             return False
         b = self.next_map[key]
@@ -97,7 +97,6 @@ class EmilBuffer(gtk.VBox):
         if type(b) == type({}):
             # The key pressed was a prefix key, like C-x.
             self.next_map = b
-            #self.update_minibuf("%s-" %key)
             self.current_prefix += key + " "
             return True
         elif type(b) == type(lambda:0):
