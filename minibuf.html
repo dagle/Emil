@@ -1,34 +1,37 @@
 <html>
-<head>
-<style type="text/css">
+  <head>
+    <style type="text/css">
 html, body {
-margin:0;
-padding:0;
-font-size:14px;
+margin: 0;
+padding: 0;
 }
-p {
-margin:0;
-padding:0;
-float:left;
+table {
+font-size: 14px;
 }
 textarea {
-float:left;
-position:relative;
-top:-4px;
-border:none;
-background-color:transparent;
+float: left;
+position: relative;
+border: none;
+background-color: transparent;
+margin: 0;
+padding: 0;
+resize: none;
+width: 100%
 }
-</style>
-</head>
-<body>
-<form name="minibuf">
-<div style="position:absolute;left:0px;top:0px;">
-<!-- XXX: this must be resized when the window is resized... or maybe
-the minibuf itself can be resized based on the contents in these two
-elements. -->
-<p id="p"></p>
-<textarea name="line" autocomplete="off" ></textarea>
-</div>
-</form>
-</body>
+    </style>
+  </head>
+  <body>
+    <table width="100%" style="position:absolute;left:-3px;top:-3px;">
+      <tbody>
+	<tr>
+	  <td id="p" nowrap>prompt</td>
+	  <td width="100%">
+	    <form name="minibuf">
+	      <textarea name="line" autocomplete="off" rows="1">text</textarea>
+	    </form>
+	  </td>
+	</tr>
+      </tbody>
+    </table>
+  </body>
 </html>
